@@ -1,0 +1,23 @@
+void spawnOneObstacle() {
+    if (obstacleCount >= maxObstacle) return;
+
+    int attempts = 0;
+
+    while (attempts < 100) {
+        int index = rand() % TOTAL_TILES;
+
+        int row = index / BOARD_SIZE;
+        int col = index % BOARD_SIZE;
+
+        bool isDarkTile = (row % 2 == 0 && col % 2 == 1) ||
+            (row % 2 == 1 && col % 2 == 0);
+
+        if (board[index] == EMPTY && isDarkTile) {
+            board[index] = OBSTACLE;
+            obstacleCount++;
+            break;
+        }
+
+        attempts++;
+    }
+}
