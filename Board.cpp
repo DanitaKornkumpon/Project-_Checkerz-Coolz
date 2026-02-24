@@ -37,12 +37,49 @@ public:
             }
         }
     }
+
+    // ฟังก์ชันเช็คว่าสามารถกระโดดกินต่อได้หรือไม่ (แก้ไขบัค Index ติดลบแล้ว)
+    bool canCapture(int index) {
+        int piece = board[index];
+        if (piece == EMPTY) return false;
+
+        int row = index / BOARD_SIZE;
+        int col = index % BOARD_SIZE;
+
+        if (piece == P1 || piece == P1_KING) { // P1 เดินลง
+            if (row + 2 < BOARD_SIZE && col - 2 >= 0) { // เช็คซ้ายล่าง
+                int midPiece = board[(row + 1) * BOARD_SIZE + (col - 1)];
+                int targetPiece = board[(row + 2) * BOARD_SIZE + (col - 2)];
+                if ((midPiece == P2 || midPiece == P2_KING) && targetPiece == EMPTY) return true;
+            }
+            if (row + 2 < BOARD_SIZE && col + 2 < BOARD_SIZE) { // เช็คขวาล่าง
+                int midPiece = board[(row + 1) * BOARD_SIZE + (col + 1)];
+                int targetPiece = board[(row + 2) * BOARD_SIZE + (col + 2)];
+                if ((midPiece == P2 || midPiece == P2_KING) && targetPiece == EMPTY) return true;
+            }
+        }
+
+        if (piece == P2 || piece == P2_KING) { // P2 เดินขึ้น
+            if (row - 2 >= 0 && col - 2 >= 0) { // เช็คซ้ายบน
+                int midPiece = board[(row - 1) * BOARD_SIZE + (col - 1)];
+                int targetPiece = board[(row - 2) * BOARD_SIZE + (col - 2)];
+                if ((midPiece == P1 || midPiece == P1_KING) && targetPiece == EMPTY) return true;
+            }
+            if (row - 2 >= 0 && col + 2 < BOARD_SIZE) { // เช็คขวาบน
+                int midPiece = board[(row - 1) * BOARD_SIZE + (col + 1)];
+                int targetPiece = board[(row - 2) * BOARD_SIZE + (col + 2)]; // แก้ไขตรงนี้แล้ว
+                if ((midPiece == P1 || midPiece == P1_KING) && targetPiece == EMPTY) return true;
+            }
+        }
+        return false;
+    }
 };
 
 int main() {
     sf::RenderWindow window(sf::VideoMode(800, 800), "Checkers 10x10 Project");
     CheckersBoard game;
     int selectedIndex = -1;
+    bool isMultiJumping = false;
 
     while (window.isOpen()) {
         sf::Event event;
@@ -53,13 +90,14 @@ int main() {
             if (event.type == sf::Event::MouseButtonPressed) {
                 if (event.mouseButton.button == sf::Mouse::Left) {
 
-                    // แก้ไข Warning conversion float to int ตรงนี้ครับ
                     int col = static_cast<int>(event.mouseButton.x / TILE_SIZE);
                     int row = static_cast<int>(event.mouseButton.y / TILE_SIZE);
                     int clickedIndex = row * BOARD_SIZE + col;
 
                     if (game.board[clickedIndex] != EMPTY) {
-                        selectedIndex = clickedIndex;
+                        if (!isMultiJumping) {
+                            selectedIndex = clickedIndex;
+                        }
                     }
                     else if (selectedIndex != -1 && game.board[clickedIndex] == EMPTY) {
 
@@ -75,7 +113,7 @@ int main() {
                         bool isValidMove = false;
                         int capturedIndex = -1;
 
-                        if (std::abs(rowDiff) == 1 && std::abs(colDiff) == 1) {
+                        if (std::abs(rowDiff) == 1 && std::abs(colDiff) == 1 && !isMultiJumping) {
                             if (movingPiece == P1 && rowDiff == 1) isValidMove = true;
                             if (movingPiece == P2 && rowDiff == -1) isValidMove = true;
                         }
@@ -101,12 +139,25 @@ int main() {
 
                             if (capturedIndex != -1) {
                                 game.board[capturedIndex] = EMPTY;
-                            }
 
-                            selectedIndex = -1;
+                                if (game.canCapture(clickedIndex)) {
+                                    selectedIndex = clickedIndex;
+                                    isMultiJumping = true;
+                                }
+                                else {
+                                    selectedIndex = -1;
+                                    isMultiJumping = false;
+                                }
+                            }
+                            else {
+                                selectedIndex = -1;
+                                isMultiJumping = false;
+                            }
                         }
                         else {
-                            selectedIndex = -1;
+                            if (!isMultiJumping) {
+                                selectedIndex = -1;
+                            }
                         }
                     }
                 }
@@ -156,5 +207,5 @@ int main() {
         }
         window.display();
     }
-    return 0; // รับรองว่าวงเล็บปิดครบถ้วนแน่นอนครับ!
+    return 0;
 }
