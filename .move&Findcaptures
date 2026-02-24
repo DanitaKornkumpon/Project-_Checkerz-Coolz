@@ -9,9 +9,11 @@ const float TILE_SIZE = 80.0f;
 
 enum PieceType { EMPTY = 0, P1 = 1, P2 = 2, P1_KING = 3, P2_KING = 4 };
 
+// โครงสร้างเก็บข้อมูลการเดิน
 struct Move {
     int toIndex;
     std::vector<int> capturedIndices;
+    std::vector<int> pathIndices; // เก็บ Index ของทุกช่องที่หมากวิ่งผ่านในเส้นทางนี้
     int score() const { return capturedIndices.size(); }
 };
 
@@ -34,13 +36,12 @@ public:
         }
     }
 
-    // ฟังก์ชันหาการกินที่ยาวที่สุด (Recursive DFS)
-    void findCaptures(int idx, PieceType p, std::vector<int> currentCaptured, std::vector<Move>& allMoves, std::vector<PieceType>& tempBoard) {
+    // ฟังก์ชันค้นหาเส้นทางแบบ DFS
+    void findCaptures(int idx, PieceType p, std::vector<int> currentCaptured, std::vector<int> currentPath, std::vector<Move>& allMoves, std::vector<PieceType>& tempBoard) {
         int r = idx / BOARD_SIZE;
         int c = idx % BOARD_SIZE;
         bool foundAnyCapture = false;
 
-        // ทิศทางที่เดินได้ (กินถอยหลังได้เสมอสำหรับทุกหมาก)
         int dr[] = {-2, -2, 2, 2};
         int dc[] = {-2, 2, -2, 2};
 
@@ -51,60 +52,37 @@ public:
             if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
                 int targetIdx = nr * BOARD_SIZE + nc;
                 int midIdx = mr * BOARD_SIZE + mc;
-                
                 PieceType midPiece = tempBoard[midIdx];
                 bool isEnemy = (p == P1 || p == P1_KING) ? (midPiece == P2 || midPiece == P2_KING) : (midPiece == P1 || midPiece == P1_KING);
 
                 if (tempBoard[targetIdx] == EMPTY && isEnemy) {
-                    // จำลองการกิน
                     tempBoard[midIdx] = EMPTY;
                     currentCaptured.push_back(midIdx);
+                    currentPath.push_back(targetIdx); // บันทึกช่องที่กระโดดลง
                     
-                    findCaptures(targetIdx, p, currentCaptured, allMoves, tempBoard);
+                    findCaptures(targetIdx, p, currentCaptured, currentPath, allMoves, tempBoard);
                     
-                    // คืนค่า (Backtrack)
                     tempBoard[midIdx] = midPiece;
                     currentCaptured.pop_back();
+                    currentPath.pop_back();
                     foundAnyCapture = true;
                 }
             }
         }
-
         if (!foundAnyCapture && !currentCaptured.empty()) {
-            allMoves.push_back({idx, currentCaptured});
+            allMoves.push_back({idx, currentCaptured, currentPath});
         }
     }
 
     std::vector<Move> getBestCaptures(int startIndex) {
         std::vector<Move> allMoves;
         std::vector<PieceType> tempBoard = board;
-        findCaptures(startIndex, board[startIndex], {}, allMoves, tempBoard);
+        findCaptures(startIndex, board[startIndex], {}, {startIndex}, allMoves, tempBoard);
 
         if (allMoves.empty()) return {};
-
-        // --- เพิ่มโค้ดส่วนนี้เพื่อแสดงการเปรียบเทียบ ---
-        std::cout << "\n--- Comparing Capture Paths for piece at [" << startIndex << "] ---" << std::endl;
-        int pathCount = 1;
         int maxScore = 0;
+        for (auto& m : allMoves) maxScore = std::max(maxScore, m.score());
 
-        for (auto& m : allMoves) {
-            std::cout << "Path " << pathCount << ": Ends at " << m.toIndex 
-                      << " | Captured: " << m.score() << " pieces" << std::endl;
-            
-            if (m.score() > maxScore) maxScore = m.score();
-            pathCount++;
-        }
-
-        std::cout << ">>> System selecting paths with MAX score: " << maxScore << " <<<" << std::endl;
-        // -------------------------------------------
-
-        // กรองเอาเฉพาะเส้นทางที่ได้แต้มสูงสุด 
-        std::vector<Move> bestMoves;
-        for (auto& m : allMoves) {
-            if (m.score() == maxScore) bestMoves.push_back(m);
-        }
-        return bestMoves;
-    }
         std::vector<Move> bestMoves;
         for (auto& m : allMoves) {
             if (m.score() == maxScore) bestMoves.push_back(m);
@@ -114,7 +92,7 @@ public:
 };
 
 int main() {
-    sf::RenderWindow window(sf::VideoMode(800, 800), "Checkers Max Capture Logic");
+    sf::RenderWindow window(sf::VideoMode(800, 800), "Checkers 10x10 - Path Highlighting");
     CheckersBoard game;
     int selectedIndex = -1;
     std::vector<Move> availableCaptures;
@@ -135,24 +113,19 @@ int main() {
                 } 
                 else if (selectedIndex != -1) {
                     bool moved = false;
-                    
-                    // ตรวจสอบว่าเป็นการกินที่ถูกต้อง (ต้องเป็นทางที่ยาวที่สุด)
-                    if (!availableCaptures.empty()) {
-                        for (auto& m : availableCaptures) {
-                            if (m.toIndex == clickedIndex) {
-                                game.board[clickedIndex] = game.board[selectedIndex];
-                                game.board[selectedIndex] = EMPTY;
-                                for (int capIdx : m.capturedIndices) game.board[capIdx] = EMPTY;
-                                moved = true;
-                                break;
-                            }
+                    for (auto& m : availableCaptures) {
+                        if (m.toIndex == clickedIndex) {
+                            game.board[clickedIndex] = game.board[selectedIndex];
+                            game.board[selectedIndex] = EMPTY;
+                            for (int capIdx : m.capturedIndices) game.board[capIdx] = EMPTY;
+                            moved = true;
+                            break;
                         }
-                    } else {
-                        // ถ้าไม่มีการกิน ให้เช็คการเดินปกติ (Logic เดิมของคุณ)
+                    }
+                    if (!moved && availableCaptures.empty()) {
                         int rDiff = (clickedIndex / 10) - (selectedIndex / 10);
                         int cDiff = (clickedIndex % 10) - (selectedIndex % 10);
                         if (std::abs(rDiff) == 1 && std::abs(cDiff) == 1) {
-                            // เช็คทิศทางเดินปกติ (P1 ลง, P2 ขึ้น)
                             if ((game.board[selectedIndex] == P1 && rDiff == 1) || (game.board[selectedIndex] == P2 && rDiff == -1)) {
                                 game.board[clickedIndex] = game.board[selectedIndex];
                                 game.board[selectedIndex] = EMPTY;
@@ -160,24 +133,49 @@ int main() {
                             }
                         }
                     }
-                    if (moved) selectedIndex = -1;
+                    if (moved) { selectedIndex = -1; availableCaptures.clear(); }
                 }
             }
         }
 
         window.clear();
-        // ส่วนการวาด (ใช้โค้ดเดิมของคุณได้เลย)
         for (int i = 0; i < TOTAL_TILES; i++) {
             sf::RectangleShape rect(sf::Vector2f(TILE_SIZE, TILE_SIZE));
             rect.setPosition((i % 10) * TILE_SIZE, (i / 10) * TILE_SIZE);
-            rect.setFillColor(((i/10 + i%10) % 2 != 0) ? sf::Color(139,69,19) : sf::Color(245,222,179));
+            
+            // สีพื้นฐานของกระดาน
+            if (((i/10 + i%10) % 2 != 0)) rect.setFillColor(sf::Color(139, 69, 19));
+            else rect.setFillColor(sf::Color(245, 222, 179));
+
+            // --- [ส่วนที่แก้ไข: แสดงสีไฮไลต์เส้นทางที่กินได้มากที่สุด] ---
+            if (selectedIndex != -1) {
+                for (auto& m : availableCaptures) {
+                    // ตรวจสอบว่าช่องปัจจุบันอยู่ในเส้นทางที่ต้องเดินผ่านหรือไม่
+                    for (int pathIdx : m.pathIndices) {
+                        if (i == pathIdx) {
+                            // ไฮไลต์เส้นทางเดินด้วยสีเขียวอ่อน (Cyan)
+                            rect.setFillColor(sf::Color(0, 255, 255, 120)); 
+                        }
+                    }
+                    // ไฮไลต์จุดสุดท้ายที่ต้องไปลงด้วยสีเหลือง
+                    if (i == m.toIndex) {
+                        rect.setFillColor(sf::Color(255, 255, 0, 180));
+                    }
+                }
+            }
+
             window.draw(rect);
 
-            if (game.board[i] != EMPTY) {  
-                sf::CircleShape circle(TILE_SIZE/2 - 5);
-                circle.setPosition((i % 10) * TILE_SIZE + 5, (i / 10) * TILE_SIZE + 5);
-                circle.setFillColor(game.board[i] == P1 ? sf::Color::Red : sf::Color::Green);
-                if (i == selectedIndex) circle.setOutlineThickness(3), circle.setOutlineColor(sf::Color::Yellow);
+            // วาดตัวหมาก
+            if (game.board[i] != EMPTY) {
+                sf::CircleShape circle(TILE_SIZE/2 - 8);
+                circle.setPosition((i % 10) * TILE_SIZE + 8, (i / 10) * TILE_SIZE + 8);
+                circle.setFillColor(game.board[i] == P1 ? sf::Color(255, 51, 51) : sf::Color(0, 153, 76));
+                
+                if (i == selectedIndex) {
+                    circle.setOutlineThickness(4);
+                    circle.setOutlineColor(sf::Color::Yellow);
+                }
                 window.draw(circle);
             }
         }
