@@ -10,3 +10,4 @@ Release/
 *.idb
 *.log
 *.tlog
+*.user
