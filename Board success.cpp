@@ -75,18 +75,30 @@ public:
         }
     }
 
-    std::vector<Move> getBestCaptures(int startIndex) {
+std::vector<Move> getBestCaptures(int startIndex) {
         std::vector<Move> allMoves;
         std::vector<PieceType> tempBoard = board;
         findCaptures(startIndex, board[startIndex], {}, allMoves, tempBoard);
 
         if (allMoves.empty()) return {};
 
-        // หาจำนวนที่กินได้มากที่สุด
+        // --- เพิ่มโค้ดส่วนนี้เพื่อแสดงการเปรียบเทียบ ---
+        std::cout << "\n--- Comparing Capture Paths for piece at [" << startIndex << "] ---" << std::endl;
+        int pathCount = 1;
         int maxScore = 0;
-        for (auto& m : allMoves) maxScore = std::max(maxScore, m.score());
 
-        // กรองเอาเฉพาะเส้นทางที่ได้แต้มสูงสุด
+        for (auto& m : allMoves) {
+            std::cout << "Path " << pathCount << ": Ends at " << m.toIndex 
+                      << " | Captured: " << m.score() << " pieces" << std::endl;
+            
+            if (m.score() > maxScore) maxScore = m.score();
+            pathCount++;
+        }
+
+        std::cout << ">>> System selecting paths with MAX score: " << maxScore << " <<<" << std::endl;
+        // -------------------------------------------
+
+        // กรองเอาเฉพาะเส้นทางที่ได้แต้มสูงสุด (Logic เดิม)
         std::vector<Move> bestMoves;
         for (auto& m : allMoves) {
             if (m.score() == maxScore) bestMoves.push_back(m);
