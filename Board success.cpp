@@ -161,17 +161,43 @@ int main() {
 
         window.clear();
         // ส่วนการวาด 
-        for (int i = 0; i < TOTAL_TILES; i++) {
+       for (int i = 0; i < TOTAL_TILES; i++) {
             sf::RectangleShape rect(sf::Vector2f(TILE_SIZE, TILE_SIZE));
             rect.setPosition((i % 10) * TILE_SIZE, (i / 10) * TILE_SIZE);
-            rect.setFillColor(((i/10 + i%10) % 2 != 0) ? sf::Color(139,69,19) : sf::Color(245,222,179));
+            
+            // สีพื้นฐานของกระดาน
+            if (((i/10 + i%10) % 2 != 0)) rect.setFillColor(sf::Color(139, 69, 19));
+            else rect.setFillColor(sf::Color(245, 222, 179));
+
+            // --- [ส่วนที่แก้ไข: แสดงสีไฮไลต์เส้นทางที่กินได้มากที่สุด] ---
+            if (selectedIndex != -1) {
+                for (auto& m : availableCaptures) {
+                    // ตรวจสอบว่าช่องปัจจุบันอยู่ในเส้นทางที่ต้องเดินผ่านหรือไม่
+                    for (int pathIdx : m.pathIndices) {
+                        if (i == pathIdx) {
+                            // ไฮไลต์เส้นทางเดินด้วยสีเขียวอ่อน (Cyan)
+                            rect.setFillColor(sf::Color(0, 255, 255, 120)); 
+                        }
+                    }
+                    // ไฮไลต์จุดสุดท้ายที่ต้องไปลงด้วยสีเหลือง
+                    if (i == m.toIndex) {
+                        rect.setFillColor(sf::Color(255, 255, 0, 180));
+                    }
+                }
+            }
+
             window.draw(rect);
 
+            // วาดตัวหมาก
             if (game.board[i] != EMPTY) {
-                sf::CircleShape circle(TILE_SIZE/2 - 5);
-                circle.setPosition((i % 10) * TILE_SIZE + 5, (i / 10) * TILE_SIZE + 5);
-                circle.setFillColor(game.board[i] == P1 ? sf::Color::Red : sf::Color::Green);
-                if (i == selectedIndex) circle.setOutlineThickness(3), circle.setOutlineColor(sf::Color::Yellow);
+                sf::CircleShape circle(TILE_SIZE/2 - 8);
+                circle.setPosition((i % 10) * TILE_SIZE + 8, (i / 10) * TILE_SIZE + 8);
+                circle.setFillColor(game.board[i] == P1 ? sf::Color(255, 51, 51) : sf::Color(0, 153, 76));
+                
+                if (i == selectedIndex) {
+                    circle.setOutlineThickness(4);
+                    circle.setOutlineColor(sf::Color::Yellow);
+                }
                 window.draw(circle);
             }
         }
