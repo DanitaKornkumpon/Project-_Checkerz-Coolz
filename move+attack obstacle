@@ -1,0 +1,36 @@
+ void moveEnemies() {
+     turnsSinceLastMove++;
+     if (turnsSinceLastMove >= MOVE_COOLDOWN) {
+         std::vector<int> currentEnemies;
+         for (int i = 0; i < TOTAL_TILES; ++i) if (board[i] == OBSTACLE) currentEnemies.push_back(i);
+
+         for (int currIdx : currentEnemies) {
+             int er = currIdx / 10, ec = currIdx % 10;
+             int targetIdx = -1; float minDist = 999.0f;
+
+             // ค้นหาเป้าหมาย
+             for (int j = 0; j < TOTAL_TILES; ++j) {
+                 if (board[j] >= 1 && board[j] <= 4) {
+                     float d = std::sqrt(std::pow((j / 10) - er, 2) + std::pow((j % 10) - ec, 2));
+                     if (d < minDist) { minDist = d; targetIdx = j; }
+                 }
+             }
+
+             if (targetIdx != -1) {
+                 int tr = targetIdx / 10, tc = targetIdx % 10;
+                 // กำหนดทิศทางแบบทะแยงเสมอเพื่อให้ลงช่องสีเข้ม (Step 1,1)
+                 int dr = (tr > er) ? 1 : -1;
+                 int dc = (tc > ec) ? 1 : -1;
+
+                 int nr = er + dr, nc = ec + dc;
+                 if (nr >= 0 && nr < 10 && nc >= 0 && nc < 10) {
+                     int nIdx = nr * 10 + nc;
+                     // เดินไปทับ = กิน / เดินไปที่ว่าง = ย้ายที่
+                     board[currIdx] = EMPTY;
+                     board[nIdx] = OBSTACLE;
+                 }
+             }
+         }
+         turnsSinceLastMove = 0;
+     }
+ }
