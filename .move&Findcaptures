@@ -173,7 +173,7 @@ int main() {
             rect.setFillColor(((i/10 + i%10) % 2 != 0) ? sf::Color(139,69,19) : sf::Color(245,222,179));
             window.draw(rect);
 
-            if (game.board[i] != EMPTY) {
+            if (game.board[i] != EMPTY) {  
                 sf::CircleShape circle(TILE_SIZE/2 - 5);
                 circle.setPosition((i % 10) * TILE_SIZE + 5, (i / 10) * TILE_SIZE + 5);
                 circle.setFillColor(game.board[i] == P1 ? sf::Color::Red : sf::Color::Green);
