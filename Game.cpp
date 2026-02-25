@@ -12,11 +12,10 @@ const float TILE_SIZE = 80.0f;
 
 enum PieceType { EMPTY = 0, P1 = 1, P2 = 2, P1_KING = 3, P2_KING = 4, OBSTACLE = 5 };
 
-// โครงสร้างเก็บข้อมูลการเดินและการกินต่อเนื่อง
 struct Move {
     int toIndex;
     std::vector<int> capturedIndices;
-    std::vector<int> pathIndices; // เก็บ Index ของทุกช่องที่หมากวิ่งผ่าน
+    std::vector<int> pathIndices;
     int score() const { return capturedIndices.size(); }
 };
 
@@ -24,7 +23,6 @@ class CheckersBoard {
 public:
     std::vector<int> board;
 
-    // ระบบกำหนดเวลา (Cooldown) สำหรับศัตรู Obstacle
     const int maxEnemies = 2;
     int turnsSinceLastSpawn = 0;
     int turnsSinceLastMove = 0;
@@ -38,19 +36,32 @@ public:
     }
 
     void initializeBoard() {
-        // หมาก P1 (แดง)
         for (int i = 0; i < 40; i++) {
             int r = i / 10, c = i % 10;
             if ((r + c) % 2 != 0) board[i] = P1;
         }
-        // หมาก P2 (เขียว)
         for (int i = 60; i < 100; i++) {
             int r = i / 10, c = i % 10;
             if ((r + c) % 2 != 0) board[i] = P2;
         }
     }
 
-    // ฟังก์ชันค้นหาเส้นทางการกินแบบ DFS (คำนวณการกินที่คุ้มที่สุด)
+    void reset() {
+        std::fill(board.begin(), board.end(), EMPTY);
+        turnsSinceLastSpawn = 0;
+        turnsSinceLastMove = 0;
+        initializeBoard();
+    }
+
+    void countPieces(int& p1Count, int& p2Count) {
+        p1Count = 0;
+        p2Count = 0;
+        for (int piece : board) {
+            if (piece == P1 || piece == P1_KING) p1Count++;
+            if (piece == P2 || piece == P2_KING) p2Count++;
+        }
+    }
+
     void findCaptures(int idx, int p, std::vector<int> currentCaptured, std::vector<int> currentPath, std::vector<Move>& allMoves, std::vector<int>& tempBoard) {
         int r = idx / BOARD_SIZE;
         int c = idx % BOARD_SIZE;
@@ -68,7 +79,6 @@ public:
                 int midIdx = mr * BOARD_SIZE + mc;
                 int midPiece = tempBoard[midIdx];
 
-                // ตรวจสอบว่าเป็นศัตรู หรือ อุปสรรค (Obstacle) หรือไม่
                 bool isEnemy = false;
                 if (p == P1 || p == P1_KING) {
                     isEnemy = (midPiece == P2 || midPiece == P2_KING || midPiece == OBSTACLE);
@@ -132,7 +142,7 @@ public:
                 if (!targetSlots.empty()) {
                     board[targetSlots[std::rand() % targetSlots.size()]] = OBSTACLE;
                     turnsSinceLastSpawn = 0;
-                    std::cout << "Neutral Enemy spawned on Dark Tile!" << std::endl;
+                    std::cout << "Neutral Enemy spawned!" << std::endl;
                 }
             }
         }
@@ -179,6 +189,30 @@ int main() {
     int selectedIndex = -1;
     std::vector<Move> availableCaptures;
     int currentTurn = P1;
+    bool isGameOver = false;
+
+    // --- โหลดรูปภาพจบเกม ---
+    sf::Texture endgameTexture;
+    bool hasEndgameImage = endgameTexture.loadFromFile("endgame.jpg");
+    sf::Sprite endgameSprite;
+    sf::FloatRect startButtonArea;
+
+    if (hasEndgameImage) {
+        endgameSprite.setTexture(endgameTexture);
+
+        // คำนวณสเกลแกน X และ Y แยกกัน เพื่อบังคับให้ภาพขยายเต็ม 800x800
+        float scaleX = 800.0f / endgameTexture.getSize().x;
+        float scaleY = 800.0f / endgameTexture.getSize().y;
+
+        endgameSprite.setScale(scaleX, scaleY);
+        endgameSprite.setPosition(0.0f, 0.0f); // จัดให้ชิดมุมซ้ายบนสุด
+
+        // ปรับตำแหน่ง Hitbox ของปุ่ม START! ใหม่ให้ตรงกับภาพที่ถูกยืด
+        startButtonArea = sf::FloatRect(330.0f, 480.0f, 140.0f, 70.0f);
+    }
+
+    sf::Font font;
+    font.loadFromFile("arial.ttf");
 
     auto endTurn = [&]() {
         selectedIndex = -1;
@@ -187,8 +221,18 @@ int main() {
         game.moveEnemies();
         currentTurn = (currentTurn == P1) ? P2 : P1;
 
-        if (currentTurn == P1) window.setTitle("Checkers - Red's Turn (P1)");
-        else window.setTitle("Checkers - Green's Turn (P2)");
+        int p1Count = 0, p2Count = 0;
+        game.countPieces(p1Count, p2Count);
+
+        if (p1Count <= 1 || p2Count <= 1) {
+            isGameOver = true;
+            if (p1Count <= 1) window.setTitle("Checkers - Green Wins! (Click START! to Restart)");
+            if (p2Count <= 1) window.setTitle("Checkers - Red Wins! (Click START! to Restart)");
+        }
+        else {
+            if (currentTurn == P1) window.setTitle("Checkers - Red's Turn (P1)");
+            else window.setTitle("Checkers - Green's Turn (P2)");
+        }
         };
 
     while (window.isOpen()) {
@@ -197,13 +241,24 @@ int main() {
             if (event.type == sf::Event::Closed) window.close();
 
             if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
+
+                if (isGameOver) {
+                    if (startButtonArea.contains(event.mouseButton.x, event.mouseButton.y)) {
+                        game.reset();
+                        isGameOver = false;
+                        currentTurn = P1;
+                        selectedIndex = -1;
+                        availableCaptures.clear();
+                        window.setTitle("Checkers - Red's Turn (P1)");
+                    }
+                    continue;
+                }
+
                 int col = event.mouseButton.x / TILE_SIZE;
                 int row = event.mouseButton.y / TILE_SIZE;
                 int clickedIndex = row * BOARD_SIZE + col;
 
                 if (col >= 0 && col < BOARD_SIZE && row >= 0 && row < BOARD_SIZE) {
-
-                    // เลือกหมาก (ตรวจว่าเป็นตาของตัวเองเท่านั้น)
                     if (game.board[clickedIndex] != EMPTY && game.board[clickedIndex] != OBSTACLE) {
                         int p = game.board[clickedIndex];
                         if ((currentTurn == P1 && (p == P1 || p == P1_KING)) ||
@@ -212,11 +267,8 @@ int main() {
                             availableCaptures = game.getBestCaptures(selectedIndex);
                         }
                     }
-                    // เดินหมาก หรือ กิน
                     else if (selectedIndex != -1) {
                         bool moved = false;
-
-                        // ตรวจสอบว่าเป็นการกระโดดกินตาม Path ที่คำนวณไว้หรือไม่
                         for (auto& m : availableCaptures) {
                             if (m.toIndex == clickedIndex) {
                                 game.board[clickedIndex] = game.board[selectedIndex];
@@ -227,11 +279,9 @@ int main() {
                             }
                         }
 
-                        // ถ้าไม่มีการกิน ให้เช็คว่าเดินปกติ 1 ช่องได้ไหม
                         if (!moved && availableCaptures.empty()) {
                             int rDiff = (clickedIndex / 10) - (selectedIndex / 10);
                             int cDiff = (clickedIndex % 10) - (selectedIndex % 10);
-
                             if (std::abs(rDiff) == 1 && std::abs(cDiff) == 1) {
                                 int p = game.board[selectedIndex];
                                 if ((p == P1 && rDiff == 1) || (p == P2 && rDiff == -1) || p == P1_KING || p == P2_KING) {
@@ -242,12 +292,10 @@ int main() {
                             }
                         }
 
-                        // ถ้าเดินสำเร็จ ให้จบตา
                         if (moved) {
                             endTurn();
                         }
                         else {
-                            // คลิกช่องว่างที่เดินไม่ได้ ยกเลิกการเลือก
                             selectedIndex = -1;
                             availableCaptures.clear();
                         }
@@ -256,8 +304,8 @@ int main() {
             }
         }
 
-        // --- Render ---
         window.clear();
+
         for (int i = 0; i < TOTAL_TILES; i++) {
             sf::RectangleShape rect(sf::Vector2f(TILE_SIZE, TILE_SIZE));
             rect.setPosition((i % 10) * TILE_SIZE, (i / 10) * TILE_SIZE);
@@ -265,23 +313,16 @@ int main() {
             if (((i / 10 + i % 10) % 2 != 0)) rect.setFillColor(sf::Color(139, 69, 19));
             else rect.setFillColor(sf::Color(245, 222, 179));
 
-            // แสดงไฮไลต์เส้นทาง
-            if (selectedIndex != -1) {
+            if (selectedIndex != -1 && !isGameOver) {
                 for (auto& m : availableCaptures) {
                     for (int pathIdx : m.pathIndices) {
-                        if (i == pathIdx) {
-                            rect.setFillColor(sf::Color(0, 255, 255, 120));
-                        }
+                        if (i == pathIdx) rect.setFillColor(sf::Color(0, 255, 255, 120));
                     }
-                    if (i == m.toIndex) {
-                        rect.setFillColor(sf::Color(255, 255, 0, 180));
-                    }
+                    if (i == m.toIndex) rect.setFillColor(sf::Color(255, 255, 0, 180));
                 }
             }
-
             window.draw(rect);
 
-            // วาดตัวหมาก
             int piece = game.board[i];
             if (piece != EMPTY) {
                 sf::CircleShape circle(TILE_SIZE / 2 - 8);
@@ -303,13 +344,35 @@ int main() {
                     circle.setOutlineColor(sf::Color::Cyan);
                 }
 
-                if (i == selectedIndex) {
+                if (i == selectedIndex && !isGameOver) {
                     circle.setOutlineThickness(4);
                     circle.setOutlineColor(sf::Color::Yellow);
                 }
                 window.draw(circle);
             }
         }
+
+        if (isGameOver) {
+            sf::RectangleShape overlay(sf::Vector2f(800.0f, 800.0f));
+            overlay.setFillColor(sf::Color(0, 0, 0, 200));
+            window.draw(overlay);
+
+            if (hasEndgameImage) {
+                window.draw(endgameSprite);
+            }
+            else {
+                sf::Text text;
+                text.setFont(font);
+                text.setString("GAME OVER\nClick center to Restart");
+                text.setCharacterSize(50);
+                text.setFillColor(sf::Color::White);
+                text.setPosition(sf::Vector2f(150.0f, 350.0f));
+                window.draw(text);
+
+                startButtonArea = sf::FloatRect(0.0f, 0.0f, 800.0f, 800.0f);
+            }
+        }
+
         window.display();
     }
     return 0;
