@@ -1,0 +1,316 @@
+#include <SFML/Graphics.hpp>
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+#include <iostream>
+#include <cmath>
+#include <algorithm>
+
+const int BOARD_SIZE = 10;
+const int TOTAL_TILES = 100;
+const float TILE_SIZE = 80.0f;
+
+enum PieceType { EMPTY = 0, P1 = 1, P2 = 2, P1_KING = 3, P2_KING = 4, OBSTACLE = 5 };
+
+// โครงสร้างเก็บข้อมูลการเดินและการกินต่อเนื่อง
+struct Move {
+    int toIndex;
+    std::vector<int> capturedIndices;
+    std::vector<int> pathIndices; // เก็บ Index ของทุกช่องที่หมากวิ่งผ่าน
+    int score() const { return capturedIndices.size(); }
+};
+
+class CheckersBoard {
+public:
+    std::vector<int> board;
+
+    // ระบบกำหนดเวลา (Cooldown) สำหรับศัตรู Obstacle
+    const int maxEnemies = 2;
+    int turnsSinceLastSpawn = 0;
+    int turnsSinceLastMove = 0;
+    const int SPAWN_COOLDOWN = 6;
+    const int MOVE_COOLDOWN = 3;
+
+    CheckersBoard() {
+        board.resize(TOTAL_TILES, EMPTY);
+        std::srand(static_cast<unsigned int>(std::time(0)));
+        initializeBoard();
+    }
+
+    void initializeBoard() {
+        // หมาก P1 (แดง)
+        for (int i = 0; i < 40; i++) {
+            int r = i / 10, c = i % 10;
+            if ((r + c) % 2 != 0) board[i] = P1;
+        }
+        // หมาก P2 (เขียว)
+        for (int i = 60; i < 100; i++) {
+            int r = i / 10, c = i % 10;
+            if ((r + c) % 2 != 0) board[i] = P2;
+        }
+    }
+
+    // ฟังก์ชันค้นหาเส้นทางการกินแบบ DFS (คำนวณการกินที่คุ้มที่สุด)
+    void findCaptures(int idx, int p, std::vector<int> currentCaptured, std::vector<int> currentPath, std::vector<Move>& allMoves, std::vector<int>& tempBoard) {
+        int r = idx / BOARD_SIZE;
+        int c = idx % BOARD_SIZE;
+        bool foundAnyCapture = false;
+
+        int dr[] = { -2, -2, 2, 2 };
+        int dc[] = { -2, 2, -2, 2 };
+
+        for (int i = 0; i < 4; i++) {
+            int nr = r + dr[i], nc = c + dc[i];
+            int mr = r + dr[i] / 2, mc = c + dc[i] / 2;
+
+            if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                int targetIdx = nr * BOARD_SIZE + nc;
+                int midIdx = mr * BOARD_SIZE + mc;
+                int midPiece = tempBoard[midIdx];
+
+                // ตรวจสอบว่าเป็นศัตรู หรือ อุปสรรค (Obstacle) หรือไม่
+                bool isEnemy = false;
+                if (p == P1 || p == P1_KING) {
+                    isEnemy = (midPiece == P2 || midPiece == P2_KING || midPiece == OBSTACLE);
+                }
+                else if (p == P2 || p == P2_KING) {
+                    isEnemy = (midPiece == P1 || midPiece == P1_KING || midPiece == OBSTACLE);
+                }
+
+                if (tempBoard[targetIdx] == EMPTY && isEnemy) {
+                    tempBoard[midIdx] = EMPTY;
+                    currentCaptured.push_back(midIdx);
+                    currentPath.push_back(targetIdx);
+
+                    findCaptures(targetIdx, p, currentCaptured, currentPath, allMoves, tempBoard);
+
+                    tempBoard[midIdx] = midPiece;
+                    currentCaptured.pop_back();
+                    currentPath.pop_back();
+                    foundAnyCapture = true;
+                }
+            }
+        }
+        if (!foundAnyCapture && !currentCaptured.empty()) {
+            allMoves.push_back({ idx, currentCaptured, currentPath });
+        }
+    }
+
+    std::vector<Move> getBestCaptures(int startIndex) {
+        std::vector<Move> allMoves;
+        std::vector<int> tempBoard = board;
+        findCaptures(startIndex, board[startIndex], {}, { startIndex }, allMoves, tempBoard);
+
+        if (allMoves.empty()) return {};
+        int maxScore = 0;
+        for (auto& m : allMoves) maxScore = std::max(maxScore, m.score());
+
+        std::vector<Move> bestMoves;
+        for (auto& m : allMoves) {
+            if (m.score() == maxScore) bestMoves.push_back(m);
+        }
+        return bestMoves;
+    }
+
+    int countEnemies() {
+        int count = 0;
+        for (int p : board) if (p == OBSTACLE) count++;
+        return count;
+    }
+
+    void spawnEnemy() {
+        turnsSinceLastSpawn++;
+        if (turnsSinceLastSpawn >= SPAWN_COOLDOWN && countEnemies() < maxEnemies) {
+            if (std::rand() % 100 < 40) {
+                std::vector<int> targetSlots;
+                for (int i = 30; i < 70; ++i) {
+                    int r = i / 10, c = i % 10;
+                    if ((r + c) % 2 != 0 && board[i] == EMPTY) {
+                        targetSlots.push_back(i);
+                    }
+                }
+                if (!targetSlots.empty()) {
+                    board[targetSlots[std::rand() % targetSlots.size()]] = OBSTACLE;
+                    turnsSinceLastSpawn = 0;
+                    std::cout << "Neutral Enemy spawned on Dark Tile!" << std::endl;
+                }
+            }
+        }
+    }
+
+    void moveEnemies() {
+        turnsSinceLastMove++;
+        if (turnsSinceLastMove >= MOVE_COOLDOWN) {
+            std::vector<int> currentEnemies;
+            for (int i = 0; i < TOTAL_TILES; ++i) if (board[i] == OBSTACLE) currentEnemies.push_back(i);
+
+            for (int currIdx : currentEnemies) {
+                int er = currIdx / 10, ec = currIdx % 10;
+                int targetIdx = -1; float minDist = 999.0f;
+
+                for (int j = 0; j < TOTAL_TILES; ++j) {
+                    if (board[j] == P1 || board[j] == P2 || board[j] == P1_KING || board[j] == P2_KING) {
+                        float d = std::sqrt(std::pow((j / 10) - er, 2) + std::pow((j % 10) - ec, 2));
+                        if (d < minDist) { minDist = d; targetIdx = j; }
+                    }
+                }
+
+                if (targetIdx != -1) {
+                    int tr = targetIdx / 10, tc = targetIdx % 10;
+                    int dr = (tr > er) ? 1 : -1;
+                    int dc = (tc > ec) ? 1 : -1;
+
+                    int nr = er + dr, nc = ec + dc;
+                    if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                        int nIdx = nr * 10 + nc;
+                        board[currIdx] = EMPTY;
+                        board[nIdx] = OBSTACLE;
+                    }
+                }
+            }
+            turnsSinceLastMove = 0;
+        }
+    }
+};
+
+int main() {
+    sf::RenderWindow window(sf::VideoMode(800, 800), "Checkers - Red's Turn (P1)");
+    CheckersBoard game;
+    int selectedIndex = -1;
+    std::vector<Move> availableCaptures;
+    int currentTurn = P1;
+
+    auto endTurn = [&]() {
+        selectedIndex = -1;
+        availableCaptures.clear();
+        game.spawnEnemy();
+        game.moveEnemies();
+        currentTurn = (currentTurn == P1) ? P2 : P1;
+
+        if (currentTurn == P1) window.setTitle("Checkers - Red's Turn (P1)");
+        else window.setTitle("Checkers - Green's Turn (P2)");
+        };
+
+    while (window.isOpen()) {
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed) window.close();
+
+            if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
+                int col = event.mouseButton.x / TILE_SIZE;
+                int row = event.mouseButton.y / TILE_SIZE;
+                int clickedIndex = row * BOARD_SIZE + col;
+
+                if (col >= 0 && col < BOARD_SIZE && row >= 0 && row < BOARD_SIZE) {
+
+                    // เลือกหมาก (ตรวจว่าเป็นตาของตัวเองเท่านั้น)
+                    if (game.board[clickedIndex] != EMPTY && game.board[clickedIndex] != OBSTACLE) {
+                        int p = game.board[clickedIndex];
+                        if ((currentTurn == P1 && (p == P1 || p == P1_KING)) ||
+                            (currentTurn == P2 && (p == P2 || p == P2_KING))) {
+                            selectedIndex = clickedIndex;
+                            availableCaptures = game.getBestCaptures(selectedIndex);
+                        }
+                    }
+                    // เดินหมาก หรือ กิน
+                    else if (selectedIndex != -1) {
+                        bool moved = false;
+
+                        // ตรวจสอบว่าเป็นการกระโดดกินตาม Path ที่คำนวณไว้หรือไม่
+                        for (auto& m : availableCaptures) {
+                            if (m.toIndex == clickedIndex) {
+                                game.board[clickedIndex] = game.board[selectedIndex];
+                                game.board[selectedIndex] = EMPTY;
+                                for (int capIdx : m.capturedIndices) game.board[capIdx] = EMPTY;
+                                moved = true;
+                                break;
+                            }
+                        }
+
+                        // ถ้าไม่มีการกิน ให้เช็คว่าเดินปกติ 1 ช่องได้ไหม
+                        if (!moved && availableCaptures.empty()) {
+                            int rDiff = (clickedIndex / 10) - (selectedIndex / 10);
+                            int cDiff = (clickedIndex % 10) - (selectedIndex % 10);
+
+                            if (std::abs(rDiff) == 1 && std::abs(cDiff) == 1) {
+                                int p = game.board[selectedIndex];
+                                if ((p == P1 && rDiff == 1) || (p == P2 && rDiff == -1) || p == P1_KING || p == P2_KING) {
+                                    game.board[clickedIndex] = game.board[selectedIndex];
+                                    game.board[selectedIndex] = EMPTY;
+                                    moved = true;
+                                }
+                            }
+                        }
+
+                        // ถ้าเดินสำเร็จ ให้จบตา
+                        if (moved) {
+                            endTurn();
+                        }
+                        else {
+                            // คลิกช่องว่างที่เดินไม่ได้ ยกเลิกการเลือก
+                            selectedIndex = -1;
+                            availableCaptures.clear();
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Render ---
+        window.clear();
+        for (int i = 0; i < TOTAL_TILES; i++) {
+            sf::RectangleShape rect(sf::Vector2f(TILE_SIZE, TILE_SIZE));
+            rect.setPosition((i % 10) * TILE_SIZE, (i / 10) * TILE_SIZE);
+
+            if (((i / 10 + i % 10) % 2 != 0)) rect.setFillColor(sf::Color(139, 69, 19));
+            else rect.setFillColor(sf::Color(245, 222, 179));
+
+            // แสดงไฮไลต์เส้นทาง
+            if (selectedIndex != -1) {
+                for (auto& m : availableCaptures) {
+                    for (int pathIdx : m.pathIndices) {
+                        if (i == pathIdx) {
+                            rect.setFillColor(sf::Color(0, 255, 255, 120));
+                        }
+                    }
+                    if (i == m.toIndex) {
+                        rect.setFillColor(sf::Color(255, 255, 0, 180));
+                    }
+                }
+            }
+
+            window.draw(rect);
+
+            // วาดตัวหมาก
+            int piece = game.board[i];
+            if (piece != EMPTY) {
+                sf::CircleShape circle(TILE_SIZE / 2 - 8);
+                circle.setPosition((i % 10) * TILE_SIZE + 8, (i / 10) * TILE_SIZE + 8);
+
+                if (piece == P1 || piece == P1_KING) {
+                    circle.setFillColor(sf::Color(255, 51, 51));
+                    circle.setOutlineThickness(2);
+                    circle.setOutlineColor(sf::Color(204, 0, 0));
+                }
+                else if (piece == P2 || piece == P2_KING) {
+                    circle.setFillColor(sf::Color(0, 153, 76));
+                    circle.setOutlineThickness(2);
+                    circle.setOutlineColor(sf::Color(0, 255, 128));
+                }
+                else if (piece == OBSTACLE) {
+                    circle.setFillColor(sf::Color::Magenta);
+                    circle.setOutlineThickness(3);
+                    circle.setOutlineColor(sf::Color::Cyan);
+                }
+
+                if (i == selectedIndex) {
+                    circle.setOutlineThickness(4);
+                    circle.setOutlineColor(sf::Color::Yellow);
+                }
+                window.draw(circle);
+            }
+        }
+        window.display();
+    }
+    return 0;
+}
