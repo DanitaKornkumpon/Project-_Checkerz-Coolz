@@ -1,0 +1,19 @@
+void spawnEnemy() {
+    turnsSinceLastSpawn++;
+    if (turnsSinceLastSpawn >= SPAWN_COOLDOWN && countEnemies() < maxEnemies) {
+        if (std::rand() % 100 < 40) { // โอกาส 40% เมื่อถึงกำหนด
+            std::vector<int> targetSlots;
+            for (int i = 30; i < 70; ++i) { // แถว 4-7
+                int r = i / 10, c = i % 10;
+                if ((r + c) % 2 != 0 && board[i] == EMPTY) {
+                    targetSlots.push_back(i);
+                }
+            }
+            if (!targetSlots.empty()) {
+                board[targetSlots[std::rand() % targetSlots.size()]] = OBSTACLE;
+                turnsSinceLastSpawn = 0;
+                std::cout << "Neutral Enemy spawned on Dark Tile!" << std::endl;
+            }
+        }
+    }
+}
