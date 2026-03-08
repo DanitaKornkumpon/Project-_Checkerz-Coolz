@@ -111,9 +111,9 @@ public:
             else if (toC < fromC) stats[id].moveLeft++;
 
             // แสดงผลลัพธ์ใน Console
-            std::cout << "[TRACKING] หมากหมายเลข " << id << " เดินรวม " << stats[id].totalMoves << " ครั้ง -> "
-                << "(หน้า: " << stats[id].moveForward << ", หลัง: " << stats[id].moveBackward
-                << ", ซ้าย: " << stats[id].moveLeft << ", ขวา: " << stats[id].moveRight << ")\n";
+            std::cout << "[TRACKING] Checker No. " << id << " All walk " << stats[id].totalMoves << " count -> "
+                << "(Front: " << stats[id].moveForward << ", Back: " << stats[id].moveBackward
+                << ", Left: " << stats[id].moveLeft << ", Right: " << stats[id].moveRight << ")\n";
         }
 
         // อัปเดตตำแหน่ง ID ในกระดานคู่ขนาน
