@@ -38,7 +38,6 @@ public:
         }
     }
 
-    // ฟังก์ชันเช็คว่าสามารถกระโดดกินต่อได้หรือไม่ (แก้ไขบัค Index ติดลบแล้ว)
     bool canCapture(int index) {
         int piece = board[index];
         if (piece == EMPTY) return false;
@@ -46,28 +45,28 @@ public:
         int row = index / BOARD_SIZE;
         int col = index % BOARD_SIZE;
 
-        if (piece == P1 || piece == P1_KING) { // P1 เดินลง
-            if (row + 2 < BOARD_SIZE && col - 2 >= 0) { // เช็คซ้ายล่าง
+        if (piece == P1 || piece == P1_KING) { 
+            if (row + 2 < BOARD_SIZE && col - 2 >= 0) { 
                 int midPiece = board[(row + 1) * BOARD_SIZE + (col - 1)];
                 int targetPiece = board[(row + 2) * BOARD_SIZE + (col - 2)];
                 if ((midPiece == P2 || midPiece == P2_KING) && targetPiece == EMPTY) return true;
             }
-            if (row + 2 < BOARD_SIZE && col + 2 < BOARD_SIZE) { // เช็คขวาล่าง
+            if (row + 2 < BOARD_SIZE && col + 2 < BOARD_SIZE) { 
                 int midPiece = board[(row + 1) * BOARD_SIZE + (col + 1)];
                 int targetPiece = board[(row + 2) * BOARD_SIZE + (col + 2)];
                 if ((midPiece == P2 || midPiece == P2_KING) && targetPiece == EMPTY) return true;
             }
         }
 
-        if (piece == P2 || piece == P2_KING) { // P2 เดินขึ้น
-            if (row - 2 >= 0 && col - 2 >= 0) { // เช็คซ้ายบน
+        if (piece == P2 || piece == P2_KING) { 
+            if (row - 2 >= 0 && col - 2 >= 0) {
                 int midPiece = board[(row - 1) * BOARD_SIZE + (col - 1)];
                 int targetPiece = board[(row - 2) * BOARD_SIZE + (col - 2)];
                 if ((midPiece == P1 || midPiece == P1_KING) && targetPiece == EMPTY) return true;
             }
-            if (row - 2 >= 0 && col + 2 < BOARD_SIZE) { // เช็คขวาบน
+            if (row - 2 >= 0 && col + 2 < BOARD_SIZE) { 
                 int midPiece = board[(row - 1) * BOARD_SIZE + (col + 1)];
-                int targetPiece = board[(row - 2) * BOARD_SIZE + (col + 2)]; // แก้ไขตรงนี้แล้ว
+                int targetPiece = board[(row - 2) * BOARD_SIZE + (col + 2)]; 
                 if ((midPiece == P1 || midPiece == P1_KING) && targetPiece == EMPTY) return true;
             }
         }
