@@ -34,8 +34,8 @@ struct PieceStats {
 class CheckersBoard {
 public:
     std::vector<int> board;
-    std::vector<int> pieceIdBoard; 
-    std::map<int, PieceStats> stats; 
+    std::vector<int> pieceIdBoard;
+    std::map<int, PieceStats> stats;
 
     const int maxEnemies = 2;
     int turnsSinceLastSpawn = 0;
@@ -62,7 +62,7 @@ public:
             }
         }
 
-        
+
         int p2_id = 21;
         for (int i = 60; i < 100; i++) {
             int r = i / 10, c = i % 10;
@@ -84,9 +84,9 @@ public:
         initializeBoard();
     }
 
-   
+
     void executeMoveAndTrackStats(int fromIdx, int toIdx, const std::vector<int>& capturedIndices) {
-        int id = pieceIdBoard[fromIdx];
+        int id = pieceIdBoard[fromIdx]; // id ของหมากตัวที่กำลังเดิน (ตัวกิน)
 
         if (id != 0) {
             int fromR = fromIdx / BOARD_SIZE, fromC = fromIdx % BOARD_SIZE;
@@ -94,7 +94,6 @@ public:
 
             stats[id].totalMoves++;
 
-            
             bool isP1 = (id >= 1 && id <= 20);
 
             if (toR > fromR) {
@@ -107,20 +106,23 @@ public:
             if (toC > fromC) stats[id].moveRight++;
             else if (toC < fromC) stats[id].moveLeft++;
 
-            
             std::cout << "[TRACKING] หมากหมายเลข " << id << " เดินรวม " << stats[id].totalMoves << " ครั้ง -> "
                 << "(หน้า: " << stats[id].moveForward << ", หลัง: " << stats[id].moveBackward
                 << ", ซ้าย: " << stats[id].moveLeft << ", ขวา: " << stats[id].moveRight << ")\n";
         }
 
-        
         pieceIdBoard[toIdx] = pieceIdBoard[fromIdx];
         pieceIdBoard[fromIdx] = 0;
+
+     
         for (int capIdx : capturedIndices) {
+            int victimId = pieceIdBoard[capIdx]; 
+            if (victimId != 0 && id != 0) {
+                std::cout << "   >>> [CAPTURE] หมากหมายเลข " << id << " กิน หมากหมายเลข " << victimId << " ไปแล้ว!\n";
+            }
             pieceIdBoard[capIdx] = 0; 
         }
     }
-
     void countPieces(int& p1Count, int& p2Count) {
         p1Count = 0; p2Count = 0;
         for (int piece : board) {
@@ -129,7 +131,7 @@ public:
         }
     }
 
-    
+
     void findCaptures(int idx, int p, std::vector<int> currentCaptured, std::vector<int> currentPath, std::vector<Move>& allMoves, std::vector<int>& tempBoard) {
         int r = idx / BOARD_SIZE, c = idx % BOARD_SIZE;
         bool foundAnyCapture = false;
@@ -189,7 +191,7 @@ public:
         return bestMoves;
     }
 
-   
+
     int countEnemies() {
         int count = 0;
         for (int p : board) if (p == OBSTACLE) count++;
@@ -276,7 +278,7 @@ int main() {
         }
     }
 
-   
+
     sf::Texture menuBgTexture;
     bool hasMenuBg = false;
     std::vector<std::string> bgFileNames = {
@@ -469,7 +471,7 @@ int main() {
                     }
                 }
                 else if (currentState == GAMEOVER) {
-                    
+
                     sf::FloatRect restartBtnBounds(250.0f, 460.0f, 300.0f, 80.0f);
 
                     if (restartBtnBounds.contains(mouseX, mouseY)) {
@@ -598,7 +600,7 @@ int main() {
                     }
                     window.draw(circle);
 
-                    
+
                     int currentID = game.pieceIdBoard[i];
                     if (currentID != 0) {
                         sf::Text idText(std::to_string(currentID), font, 18);
@@ -611,7 +613,7 @@ int main() {
                 }
             }
 
-           
+
             if (currentState == GAMEOVER) {
                 sf::RectangleShape overlay(sf::Vector2f(800.0f, 800.0f));
                 overlay.setFillColor(sf::Color(0, 0, 0, 180));
@@ -620,7 +622,7 @@ int main() {
                 sf::Text winText;
                 winText.setFont(font);
 
-               
+
                 if (winner == P2) {
                     winText.setString("GREEN WINS!");
                     winText.setFillColor(sf::Color::Green);
