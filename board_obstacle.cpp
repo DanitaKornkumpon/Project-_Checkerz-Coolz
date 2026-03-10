@@ -15,12 +15,10 @@ class CheckersBoard {
 public:
     std::vector<int> board;
     const int maxEnemies = 2;
-
-    // ระบบกำหนดเวลา (Cooldown)
     int turnsSinceLastSpawn = 0;
     int turnsSinceLastMove = 0;
-    const int SPAWN_COOLDOWN = 6; // รอถึงจะสุ่มเกิด
-    const int MOVE_COOLDOWN = 3;  // ขยับ 1 ครั้ง ทุกๆกี่ตา
+    const int SPAWN_COOLDOWN = 6;
+    const int MOVE_COOLDOWN = 3; 
 
     CheckersBoard() {
         board.resize(TOTAL_TILES, EMPTY);
@@ -45,11 +43,10 @@ public:
         return count;
     }
 
-    // สุ่มเกิดเฉพาะช่องสีเข้มในโซนกลาง และห้ามทับใคร
     void spawnEnemy() {
         turnsSinceLastSpawn++;
         if (turnsSinceLastSpawn >= SPAWN_COOLDOWN && countEnemies() < maxEnemies) {
-            if (std::rand() % 100 < 40) { // โอกาส 40% เมื่อถึงกำหนด
+            if (std::rand() % 100 < 40) { 
                 std::vector<int> targetSlots;
                 for (int i = 30; i < 70; ++i) { // แถว 4-7
                     int r = i / 10, c = i % 10;
@@ -66,7 +63,6 @@ public:
         }
     }
 
-    // เดินเฉพาะช่องสีเข้ม (ทะแยง) เพื่อไล่ล่าหมากที่ใกล้ที่สุด
     void moveEnemies() {
         turnsSinceLastMove++;
         if (turnsSinceLastMove >= MOVE_COOLDOWN) {
@@ -76,8 +72,6 @@ public:
             for (int currIdx : currentEnemies) {
                 int er = currIdx / 10, ec = currIdx % 10;
                 int targetIdx = -1; float minDist = 999.0f;
-
-                // ค้นหาเป้าหมาย
                 for (int j = 0; j < TOTAL_TILES; ++j) {
                     if (board[j] >= 1 && board[j] <= 4) {
                         float d = std::sqrt(std::pow((j / 10) - er, 2) + std::pow((j % 10) - ec, 2));
@@ -86,15 +80,13 @@ public:
                 }
 
                 if (targetIdx != -1) {
-                    int tr = targetIdx / 10, tc = targetIdx % 10;
-                    // กำหนดทิศทางแบบทะแยงเสมอเพื่อให้ลงช่องสีเข้ม (Step 1,1)
+                    int tr = targetIdx / 10, tc = targetIdx % 10
                     int dr = (tr > er) ? 1 : -1;
                     int dc = (tc > ec) ? 1 : -1;
 
                     int nr = er + dr, nc = ec + dc;
                     if (nr >= 0 && nr < 10 && nc >= 0 && nc < 10) {
-                        int nIdx = nr * 10 + nc;
-                        // เดินไปทับ = กิน / เดินไปที่ว่าง = ย้ายที่
+                        int nIdx = nr * 10 + nc;                      
                         board[currIdx] = EMPTY;
                         board[nIdx] = OBSTACLE;
                     }
@@ -130,12 +122,11 @@ int main() {
                         int piece = game.board[selectedIndex];
                         bool valid = false; int cap = -1;
 
-                        // เดินปกติ
                         if (std::abs(rd) == 1 && std::abs(cd) == 1) {
                             if (piece == P1 && rd == 1) valid = true;
                             if (piece == P2 && rd == -1) valid = true;
                         }
-                        // กระโดดกิน (หมากผู้เล่น หรือ ศัตรูสีม่วง)
+                            
                         else if (std::abs(rd) == 2 && std::abs(cd) == 2) {
                             int mid = (fr + rd / 2) * 10 + (fc + cd / 2);
                             if (piece == P1 && (game.board[mid] == P2 || game.board[mid] == OBSTACLE)) { valid = true; cap = mid; }
@@ -146,8 +137,6 @@ int main() {
                             game.board[clickedIndex] = piece;
                             game.board[selectedIndex] = EMPTY;
                             if (cap != -1) game.board[cap] = EMPTY;
-
-                            // อัปเดตระบบศัตรูหลังจบตา
                             game.spawnEnemy();
                             game.moveEnemies();
 
