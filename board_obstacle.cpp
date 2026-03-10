@@ -48,7 +48,7 @@ public:
         if (turnsSinceLastSpawn >= SPAWN_COOLDOWN && countEnemies() < maxEnemies) {
             if (std::rand() % 100 < 40) { 
                 std::vector<int> targetSlots;
-                for (int i = 30; i < 70; ++i) { // แถว 4-7
+                for (int i = 30; i < 70; ++i) { 
                     int r = i / 10, c = i % 10;
                     if ((r + c) % 2 != 0 && board[i] == EMPTY) {
                         targetSlots.push_back(i);
